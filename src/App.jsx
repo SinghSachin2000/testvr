@@ -1,7 +1,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, createPortal, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
-import { Controllers, Hands, Interactive, VRButton, XR, useXR } from '@react-three/xr'
+import { Controllers, Hands, Interactive, Ray, VRButton, XR, useXR } from '@react-three/xr'
 import * as THREE from 'three'
 
 const MODEL_PATH = '/models/taj-mahal.glb'
@@ -107,6 +107,7 @@ function Scene({ onMeshSelect, onXrStateChange }) {
           hideRaysOnBlur={false}
           rayMaterial={{ color: '#3ba7ff', opacity: 0.8, transparent: true }}
         />
+        <HandRays />
         <GazeRay />
         <Hands />
         <Ground />
@@ -296,6 +297,29 @@ function GazeRay() {
       </bufferGeometry>
       <lineBasicMaterial color="#3ba7ff" linewidth={2} transparent opacity={0.8} />
     </line>
+  )
+}
+
+// Quest hand-tracking hides default controller rays; this keeps a visible pointer tied to each hand source.
+function HandRays() {
+  const { controllers, isHandTracking } = useXR()
+
+  if (!isHandTracking || controllers.length === 0) {
+    return null
+  }
+
+  return controllers.map((target, i) =>
+    createPortal(
+      <Ray
+        key={i}
+        target={target}
+        visible
+        material-color="#3ba7ff"
+        material-opacity={0.9}
+        material-transparent
+      />,
+      target.controller
+    )
   )
 }
 
