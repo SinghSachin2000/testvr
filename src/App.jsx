@@ -1,11 +1,12 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react'
-import { Canvas } from '@react-three/fiber'
+import { Canvas, useFrame } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import { Controllers, Hands, Interactive, VRButton, XR, useXR } from '@react-three/xr'
 import * as THREE from 'three'
 
 const MODEL_PATH = '/models/taj-mahal.glb'
 const SELECT_EMISSIVE = new THREE.Color('#5fb7ff')
+const VR_MODEL_OFFSET = [0, 0, -12]
 const XR_SESSION_OPTIONS = {
   optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers'],
 }
@@ -106,6 +107,7 @@ function Scene({ onMeshSelect, onXrStateChange }) {
           hideRaysOnBlur={false}
           rayMaterial={{ color: '#3ba7ff', opacity: 0.8, transparent: true }}
         />
+        <GazeRay />
         <Hands />
         <Ground />
         <ReflectingPool />
@@ -165,6 +167,7 @@ function ReflectingPool() {
 
 function TajMahalModel({ onMeshSelect }) {
   const { scene } = useGLTF(MODEL_PATH)
+  const { isPresenting } = useXR()
   const activeMeshRef = useRef(null)
 
   const clonedScene = useMemo(() => {
@@ -236,6 +239,7 @@ function TajMahalModel({ onMeshSelect }) {
   return (
     <Interactive onSelect={handleActivate}>
       <group
+        position={isPresenting ? VR_MODEL_OFFSET : [0, 0, 0]}
         onClick={handleActivate}
         onPointerOut={() => {
           document.body.style.cursor = 'auto'
@@ -247,6 +251,51 @@ function TajMahalModel({ onMeshSelect }) {
         <primitive dispose={null} object={clonedScene} />
       </group>
     </Interactive>
+  )
+}
+
+function GazeRay() {
+  const { controllers, isPresenting, player } = useXR()
+  const lineRef = useRef(null)
+  const geometryRef = useRef(null)
+
+  useFrame(() => {
+    if (!lineRef.current || !geometryRef.current) {
+      return
+    }
+
+    // Only show the fallback head-based ray when in VR and no controllers are present.
+    if (!isPresenting || controllers.length > 0) {
+      lineRef.current.visible = false
+      return
+    }
+
+    lineRef.current.visible = true
+
+    const start = new THREE.Vector3()
+    player.getWorldPosition(start)
+
+    const end = start
+      .clone()
+      .add(new THREE.Vector3(0, 0, -1).applyQuaternion(player.quaternion).multiplyScalar(12))
+
+    const positions = geometryRef.current.attributes.position.array
+    positions[0] = start.x
+    positions[1] = start.y
+    positions[2] = start.z
+    positions[3] = end.x
+    positions[4] = end.y
+    positions[5] = end.z
+    geometryRef.current.attributes.position.needsUpdate = true
+  })
+
+  return (
+    <line ref={lineRef} visible={false}>
+      <bufferGeometry ref={geometryRef}>
+        <bufferAttribute attach="attributes-position" array={new Float32Array(6)} count={2} itemSize={3} />
+      </bufferGeometry>
+      <lineBasicMaterial color="#3ba7ff" linewidth={2} transparent opacity={0.8} />
+    </line>
   )
 }
 
