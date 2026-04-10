@@ -241,6 +241,7 @@ function TajMahalModel({ onMeshSelect }) {
     <Interactive onSelect={handleActivate}>
       <group
         position={isPresenting ? VR_MODEL_OFFSET : [0, 0, 0]}
+        scale={0.1}
         onClick={handleActivate}
         onPointerOut={() => {
           document.body.style.cursor = 'auto'
